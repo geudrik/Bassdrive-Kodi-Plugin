@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<strings>
+
+	<!-- The strings 30000 to 30999 is reserved for plug-in parameters -->
+	<!--GENERAL STRINGS -->
+
+	<!-- Category: General -->
+	<string id="30001">General</string>
+	<string id="30011">Stream Cache Expiry (days)</string>
+	<string id="30012">Force all streams to be updated on reload of the plugin</string>
+
+	<!-- Category: About -->
+	<string id="30002">About</string>
+	<string id="30025">Bassdrive is powered by SHOUTcast</string>
+	<string id="30026">Bassdrive Homepage:  http://bassdrive.com</string>
+	<string id="30027">Kodi Plugin Author:  Pat 'geudrik' Litke</string>
+	<string id="30028">Kodi Plugin Git Repo:  https://github.com/geudrik/Bassdrive-Kodi-Plugin</string>
+
+	<!-- Errors / Misc strings -->
+	<string id="30404">Unable to download the requested streamlist from Bassdrive</string>
+
+</strings>

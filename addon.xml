@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="kodi.bassdrive.arcti.cc"
+       name="Bassdrive"
+       version="0.1.0"
+       provider-name="Pat Litke | arcti.cc">
+	<requires>
+		<import addon="xbmc.python" version="2.6"/>
+	</requires>
+	<extension point="xbmc.python.pluginsource" library="addon.py">
+		<provides>audio</provides>
+	</extension>
+	<extension point="xbmc.addon.metadata">
+		<platform>all</platform>
+		<language>en</language>
+		<license>MIT</license>
+    	<website>http://bassdrive.com/</website>
+		<source>https://github.com/geudrik/Bassdrive-Kodi-Plugin</source>
+   		<summary lang="en">World-Wide, Live Drum and Bass Radio</summary>
+		<description lang="en">
+			Bassdrive Worldwide Drum and Bass Radio is a 24/7 drum and bass radio station featuring live shows with guest DJs, as well as broadcasts from venues all over the world representing the best of drum and bass and jungle music from around the globe. 
+		</description>
+	</extension>
+</addon>
