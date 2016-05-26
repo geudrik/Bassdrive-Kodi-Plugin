@@ -6,78 +6,104 @@ import xbmcplugin
 import xbmcaddon
 
 from ConfigParser import SafeConfigParser
-from urllib2 import urlopen
-from datetime import datetime
 from datetime import timedelta
+from datetime import datetime
+from urllib2 import urlopen
+
 import random
 import time
 import sys
 import os
 
-#   We use JSON as cache files, so import as necessary
 try:
     import json
 except ImportError:
     import simplejson as json
 
-# Load our "config"
-pluginConfig = SafeConfigParser()
-pluginConfig.read(os.path.join(os.path.dirname(__file__), "config.ini"))
-
-# Plugin constants
-bassdrive = xbmcaddon.Addon(id=pluginConfig.get('plugin', 'id'))
-
-# Figure out where our profile path is for this plugin
-pluginProfilePath = xbmc.translatePath(bassdrive.getAddonInfo('profile')).decode('utf-8')
-
-__plugin__ = bassdrive.getAddonInfo('name')
-__author__ = "Pat Litke"
-__url__ = "https://github.com/geudrik/Bassdrive-Kodi-Plugin"
-__platform__ = "xbmc media center, [LINUX, OS X, WIN32]"
-__date__ = pluginConfig.get('plugin', 'date')
-__version__ = bassdrive.getAddonInfo('version')
-
-addon_handle = int(sys.argv[1])
-
-
-# Define our Player Class / Manager
 class BassDrive:
 
     def __init__(self):
-        xbmc.log("[%s] v%s (%s) starting up..." % (__plugin__, __version__, __date__), xbmc.LOGNOTICE)
+
+        # Load our "config"
+        self.bd_config = SafeConfigParser()
+        self.bd_config.read(os.path.join(os.path.dirname(__file__), "config.ini"))
+        
+        # Plugin constants
+        self.bd_addon = xbmcaddon.Addon(id=self.bd_config.get('plugin', 'id'))
+        
+        # Figure out where our profile path is for this plugin
+        self.bd_ppath = xbmc.translatePath(self.bd_addon.getAddonInfo('profile')).decode('utf-8')
+
+        # Define our handle
+        self.bd_handle = int(sys.argv[1])
+
+        # Define cache bits, ensure our cachedir exists
+        self.cachefile = self.bd_config.get('cachefiles', 'streams')
+        self.cachedir = os.path.join(self.bd_ppath, 'cache')
+        self.cache_streams_path = os.path.join(self.cachedir, self.cachefile)
+        if not self.cache_streams_path:
+            os.makedirs(self.cachedir)
 
     def log(self, msg):
-        xbmc.log("[%s] %s" % (__plugin__, msg), xbmc.LOGNOTICE)
+        xbmc.log("[Bassdrive Plugin] %s" % (msg), xbmc.LOGNOTICE)
 
-    def _cache_file_has_expired(self, fpath, days):
+    def _cache_file_has_expired(self, days):
         """ Checks on a cache file to see if it's lived past its livable timeframe
-
-            Args:
-                fpath (str) : The filepath we're checking on
-                days (int) : Age in days this file is allowed to be
-
-            Returns:
-                True if our cache file has expired
-                False if the cache file is still within its livable timefram
+        :param days: days (int) : Age in days this file is allowed to be
+        :return True: If our cache file has expired
+        :return False: If the cache file is still within its livable timefram
         """
 
         # Check to make sure the filepath exists (eg: it won't on first run)
         #   Return True, indicating that we need a cache update
 
-        self.log("Checking to see if our cache has expired...")
+        self.log("Checking to see if our cache file has expired")
 
-        if not os.path.exists(fpath):
-            self.log("Our cache patche doesn't exist. Not bothering to check anything")
+        if not os.path.exists(self.cache_streams_path):
+            self.log("Our cache path doesn't exist. Not bothering to check anything")
             return True
 
-        tstamp = time.ctime(os.path.getmtime(fpath))
-        tstamp = datetime.strptime(tstamp, '%a %b %d %H:%M:%S %Y')
+        if days == 0:
+            self.log("Cache settings denote noexpire. Not checking, assuming still valid")
+            return False
+
+        if days > 28:
+            self.log("Cache expiry set higher than 28 days. Ignoring, and defaulting to 7. Setting app settings to 7")
+            self.bd_config.setSetting('streamcacheexpiredays', '7')
+            days = 7
+
+        # The epoch of lst modified timestamp of our cache file
+        tstamp = time.ctime(os.path.getmtime(self.cache_streams_path))
+
+        # There's an issue with .. I'm not 100% sure what. The datetime lib on stray versions of python?
+        #   http://forum.kodi.tv/showthread.php?tid=112916&pid=1212394#pid1212394
+        try:
+            tstamp = datetime.strptime(tstamp, '%a %b %d %H:%M:%S %Y')
+        except TypeError:
+            tstamp = datetime.fromtimestamp(time.mktime(time.strptime(tstamp, '%a %b %d %H:%M:%S %Y')))
+
         if tstamp > datetime.utcnow() + timedelta(days=days):
-            self.log("Cache has expired for %s".format(fpath))
+            self.log("Cache file has expired")
             return True
 
-        self.log("Cache is still valid")
+        self.log("Cache file is still valid")
         return False
+
+    def _urllib_get_m3us(self, url):
+        """ Query a URL for an m3u file, iterate over it line by line, and build a list of lines to return
+        :param url: the .m3u URL we're querying for
+        :return False: Upon failure to get the specified file
+        :return type(list): URLs on success
+
+        TODO: There's more we can do here... for sanitization, but do we really need to?
+        """
+
+        try:
+            data = urlopen(url)
+            return [line.strip() for line in data]
+        except Exception as e:
+            self.log(e.message)
+            return False
 
     def _update_streams(self):
         """ Get all of the m3u files from BassDrive, parse them, and shove them into our json cache
@@ -88,80 +114,76 @@ class BassDrive:
             '128k' : [ url1, url2, ... ]
         }
         """
+        self.log("Pulling m3u's from bassdrive.com and building our stream cache")
 
         streams = {}
+        for key, url in self.bd_config.items('streams'):
+            urls = self._urllib_get_m3us(url)
+            if not urls:
+                continue
+            streams[key] = urls
 
-        def get_streams(url, key):
-            streams[key] = []
-            data = urlopen(url)
-            for line in data:
-                streams[key].append(line.strip())
-
-        for key, url in pluginConfig.items('streams'):
-            get_streams(url, key)
-
-        # Check to see if the cache file/folder exist. Create if necessary
-        #   TODO: Move this out into a .. firstrun?
-        cachefile = pluginConfig.get('cachefiles', 'streams')
-        cachedir = os.path.split(cachefile)[0]
-        if not os.path.exists(os.path.join(pluginProfilePath, cachedir)):
-            os.makedirs(os.path.join(pluginProfilePath, cachedir))
-
-        with open(os.path.join(pluginProfilePath, cachefile), 'w+') as handle:
+        self.log("Writing stream cache to file: %s" % self.cache_streams_path)
+        with open(self.cache_streams_path, 'w+') as handle:
+            # TODO this has the potential to fail, but it's unlikely. Might want to try/catch ?
             json.dump(streams, handle)
 
+        return True
+
     def _get_stream(self, quality):
-        """ Return a URL to be played, grabbed from our cache file"""
-
-        with open(os.path.join(pluginProfilePath, pluginConfig.get('cachefiles', 'streams'))) as handle:
+        """ Return a random URL for a given bitrate requested to play
+        :param quality: string of bitrate we're after, as a keyname in our json cachefile
+        :return str: A URL to be played :D
+        TODO: Should this have any potential error handling? /shrug
+        """
+        self.log("Getting random %s stream to build 'playlist' with" % quality)
+        with open(self.cache_streams_path) as handle:
             cache = json.load(handle)
-
-        print "Cache: ", cache
-        print "Quality: ", quality
-        print cache[quality]
         return random.choice(cache[quality])
 
     # Lets play some Fishdrive!
     def run(self):
 
         # Check to see if our cache has expired
-        _cachepath = pluginConfig.get('cachefiles', 'streams')
-        _cachedays = bassdrive.getSetting("cacheexpire_days")
-        if self._cache_file_has_expired(_cachepath, _cachedays) and bassdrive.getSetting("forceupdate") != "true":
-            bassdrive.setSetting(id="forceupdate", value="true")
+        cachedays = int(self.bd_addon.getSetting("stream_cache_expiry_days"))
+        if self._cache_file_has_expired(cachedays):
+            self.log("Stream cache is expired. Requesting forced update")
+            self._update_streams()
+            self.bd_addon.setSetting(id="forceupdate", value="false")
 
         # Check to see if we're focing an update
-        if bassdrive.getSetting("forceupdate") == "true":
+        if self.bd_addon.getSetting("forceupdate") == "true":
+            self.log("Aforce update been requested. Updating cache...")
             self._update_streams()
 
         # Build "playlist", one quality per line
         total_items = 0
-        for key, _url in pluginConfig.items('streams'):
+        for key, _x in self.bd_config.items('streams'):
             total_items += 1
 
             url = self._get_stream(key)
 
             # Generate a list item for Kodi
-            li = xbmcgui.ListItem(label="[COLOR FF007EFF]Bassdrive @ {0}[/COLOR]".format(key), thumbnailImage="")
+            li = xbmcgui.ListItem(label="Bassdrive @ %s" % key, thumbnailImage="%s" % os.path.join(self.bd_ppath,
+                                                                                                   'icon.png'))
             
             # Set our stream quality, per Bassdrives website
+            li.setProperty("mimetype", "audio/aac")
             if key == '128k':
                 li.setProperty("mimetype", "audio/mpeg")
-            else:
-                li.setProperty("mimetype", "audio/aac")
 
             # Set player info
             li.setInfo(type="Music", infoLabels={"Genre": "Drum & Bass",
                                                  "Comment": "World Wide Drum & Bass",
                                                  "Size": int(key[:-1]) * 1024})
             li.setProperty("IsPlayable", "true")
-            xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=False,
+            xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=url, listitem=li, isFolder=False,
                                         totalItems=total_items)
 
         print total_items
 
         # tell XMBC there are no more items to list
-        xbmcplugin.endOfDirectory(addon_handle, succeeded=True)
+        xbmcplugin.endOfDirectory(self.bd_handle, succeeded=True)
 
         # Success
         return True

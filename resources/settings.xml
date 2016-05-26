@@ -2,7 +2,7 @@
 <settings>
 
 	<category label="30001">
-		<setting label="30011" type="slider" id="limit" default="7" range="0,1,28" option="int" />
+		<setting id="stream_cache_expiry_days" type="slider" label="30011" default="7" range="0,1,28" option="int" />
         <setting id="forceupdate" type="bool" label="30012" default="false" />
 	</category>
 
