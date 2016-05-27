@@ -153,7 +153,7 @@ class BassDrive:
 
         # Check to see if we're focing an update
         if self.bd_addon.getSetting("forceupdate") == "true":
-            self.log("Aforce update been requested. Updating cache...")
+            self.log("A force update been requested. Updating cache...")
             self._update_streams()
 
         # Build "playlist", one quality per line
