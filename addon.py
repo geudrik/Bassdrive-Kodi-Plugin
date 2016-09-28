@@ -41,7 +41,7 @@ class BassDrive:
         self.cachefile = self.bd_config.get('cachefiles', 'streams')
         self.cachedir = os.path.join(self.bd_ppath, 'cache')
         self.cache_streams_path = os.path.join(self.cachedir, self.cachefile)
-        if not self.cache_streams_path:
+        if not os.path.exists(self.cache_streams_path):
             os.makedirs(self.cachedir)
 
     def log(self, msg):
