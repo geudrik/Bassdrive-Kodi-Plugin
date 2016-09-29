@@ -166,13 +166,13 @@ class BassDrive:
             key = key_names.pop(0)
 
         for item in data_structure:
-            if isinstance(item,dict) and item['display_name'] == key:
+            if isinstance(item,dict) and item.keys().pop() == key:
                 #If we're at the bottom of the datastructure, we have found our result.
                 if len(key_names) == 0:
-                    return item['contents']
+                    return item[key]
                 else:
                     # if we are not at the bottom of the data strucutre, recurse!
-                    return self._fetch_nested_data(key_names,item['contents'])
+                    return self._fetch_nested_data(key_names,item[key])
 
     def _build_archives_url(self,filename):
         """ Return a url to a file in the bassdrive archives.
@@ -247,7 +247,7 @@ class BassDrive:
             if calling_foldername == "Archives":
                 for archive_item in self.archive_data:
 
-                    item_name = archive_item['display_name']
+                    item_name = archive_item.keys().pop()
 
                     archive_url = self._build_url({'mode': 'folder', 'foldername': '{}/{}'.format(calling_foldername,item_name)})
                     test = xbmcgui.ListItem(label=item_name)
@@ -264,7 +264,7 @@ class BassDrive:
 
                     # if the item is a directory (stored as a dict) display accordingly, else, it's a file.
                     if isinstance(item,dict):
-                        item_name = item['display_name']
+                        item_name = item.keys().pop()
 
 
                         archive_url = self._build_url({'mode': 'folder', 'foldername': '{}/{}'.format(calling_foldername,item_name)})
