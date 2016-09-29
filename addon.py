@@ -50,14 +50,13 @@ class BassDrive:
         self.cachefile = self.bd_config.get('cachefiles', 'streams')
         self.cachedir = os.path.join(self.bd_ppath, 'cache')
         self.cache_streams_path = os.path.join(self.cachedir, self.cachefile)
-        if not os.path.exists(self.cache_streams_path):
-            os.makedirs(self.cachedir)
 
         self.arcachefile = self.bd_config.get('cachefiles', 'archives')
-        self.arcachedir = os.path.join(self.bd_ppath, 'cache')
-        self.arcache_streams_path = os.path.join(self.arcachedir, self.arcachefile)
-        if not os.path.exists(self.arcache_streams_path):
-            os.makedirs(self.arcachedir)
+        self.arcache_streams_path = os.path.join(self.cachedir, self.arcachefile)
+
+        if not os.path.exists(self.cachedir):
+            os.makedirs(self.cachedir)
+
 
     def log(self, msg):
         xbmc.log("[Bassdrive Plugin] %s" % (msg), xbmc.LOGNOTICE)
@@ -159,7 +158,7 @@ class BassDrive:
 
         self.log("Building object of all archives from archives.bassdrive.com and writing cache file")
 
-        def recursive_fetch(url)
+        def recursive_fetch(url):
 
             blacklisted_labels = [ 'Parent Directory' ]
 
@@ -200,6 +199,7 @@ class BassDrive:
                     results.append( { sanitized_dir_name : recursive_fetch(url + url_path)})
         
         results = recursive_fetch('http://archives.bassdrivearchive.com')
+        self.log(results)
         with open(self.arcache_streams_path, 'w+') as handle:
             json.dump(results, handle)
 
@@ -210,7 +210,7 @@ class BassDrive:
         This function simply loads the cache file. 
         Note that if the archives get huge, the memory footprint of this could get massive
         """
-        self.log("Loading up our archive data...")
+        self.log("Loading up our archive data from %s..." % self.arcache_streams_path)
         with open(self.arcache_streams_path) as handle:
             cache = json.load(handle)
         return cache
