@@ -231,14 +231,14 @@ class BassDrive:
         :param key_names: a list of strings that represent different layers of the datastructure
         :param data_structure: the structure containing all directories and filenames available.
         """
-        key = key_names.pop()
+        key = key_names.pop(0)
 
         # If our first key is "Archives", then just get the next one.
         if key == "Archives":
-            key = key_names.pop()
+            key = key_names.pop(0)
 
         for item in data_structure:
-            if isinstance(item, dict) and item.keys()[-1] == key:
+            if isinstance(item, dict) and item.keys()[0] == key:
                 #If we're at the bottom of the datastructure, we have found our result.
                 if len(key_names) == 0:
                     return item[key]
