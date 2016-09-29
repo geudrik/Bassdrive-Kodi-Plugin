@@ -10,6 +10,10 @@ from datetime import timedelta
 from datetime import datetime
 from urllib2 import urlopen
 
+import HTMLParser
+import test_data
+import urlparse
+import urllib
 import random
 import time
 import sys
@@ -23,7 +27,6 @@ except ImportError:
 class BassDrive:
 
     def __init__(self):
-
         # Load our "config"
         self.bd_config = SafeConfigParser()
         self.bd_config.read(os.path.join(os.path.dirname(__file__), "config.ini"))
@@ -34,18 +37,28 @@ class BassDrive:
         # Figure out where our profile path is for this plugin
         self.bd_ppath = xbmc.translatePath(self.bd_addon.getAddonInfo('profile')).decode('utf-8')
 
-        # Define our handle
+        # Gather some args for use later.
+        self.base_url = sys.argv[0]
         self.bd_handle = int(sys.argv[1])
+        self.args = urlparse.parse_qs(sys.argv[2][1:])
+        self.mode = urlparse.parse_qs(sys.argv[2][1:]).get('mode',None)
+
 
         # Define cache bits, ensure our cachedir exists
         self.cachefile = self.bd_config.get('cachefiles', 'streams')
         self.cachedir = os.path.join(self.bd_ppath, 'cache')
         self.cache_streams_path = os.path.join(self.cachedir, self.cachefile)
-        if not self.cache_streams_path:
+        if not os.path.exists(self.cache_streams_path):
             os.makedirs(self.cachedir)
+
+        #remove this once the scraper is integrated to the main codebase
+        self.archive_data = test_data.archive_data
 
     def log(self, msg):
         xbmc.log("[Bassdrive Plugin] %s" % (msg), xbmc.LOGNOTICE)
+
+    def _build_url(self,query):
+        return self.base_url + '?' + urllib.urlencode(query)
 
     def _cache_file_has_expired(self, days):
         """ Checks on a cache file to see if it's lived past its livable timeframe
@@ -141,8 +154,43 @@ class BassDrive:
             cache = json.load(handle)
         return random.choice(cache[quality])
 
+    def _fetch_nested_data(self,key_names,data_structure):
+        """ Search through a nested datastructure for a dict with a given display_name
+        :param key_names: a list of strings that represent different layers of the datastructure
+        :param data_structure: the structure containing all directories and filenames available.
+        """
+        key = key_names.pop(0)
+
+        # If our first key is "Archives", then just get the next one.
+        if key == "Archives":
+            key = key_names.pop(0)
+
+        for item in data_structure:
+            if isinstance(item,dict) and item['display_name'] == key:
+                #If we're at the bottom of the datastructure, we have found our result.
+                if len(key_names) == 0:
+                    return item['contents']
+                else:
+                    # if we are not at the bottom of the data strucutre, recurse!
+                    return self._fetch_nested_data(key_names,item['contents'])
+
+    def _build_archives_url(self,filename):
+        """ Return a url to a file in the bassdrive archives.
+        :param filename: string containing the filename.  This will be joined with the base URL
+            as well as the directory as found from self.args['foldername']
+        """
+        directory = self.args['foldername'][0].replace("Archives/","")
+
+        return 'http://archives.bassdrivearchive.com/{}/{}'.format(directory,filename)
+
     # Lets play some Fishdrive!
     def run(self):
+        #debugging info, remove me later!
+        self.log("running run()")
+        self.log(self.args)
+        self.log(self.base_url)
+        self.log(self.bd_handle)
+        self.log(self.mode)
 
         # Check to see if our cache has expired
         cachedays = int(self.bd_addon.getSetting("stream_cache_expiry_days"))
@@ -156,34 +204,93 @@ class BassDrive:
             self.log("A force update been requested. Updating cache...")
             self._update_streams()
 
-        # Build "playlist", one quality per line
-        total_items = 0
-        for key, _x in self.bd_config.items('streams'):
-            total_items += 1
+        directory_items = []
 
-            url = self._get_stream(key)
+        # If we are not in 'folder' mode, just print the main menu.
+        if self.mode is None:
+            # Build "playlist", one quality per line
+            for key, _x in self.bd_config.items('streams'):
 
-            # Generate a list item for Kodi
-            li = xbmcgui.ListItem(label="Bassdrive @ %s" % key, thumbnailImage="%s" % os.path.join(self.bd_ppath,
-                                                                                                   'icon.png'))
-            
-            # Set our stream quality, per Bassdrives website
-            li.setProperty("mimetype", "audio/aac")
-            if key == '128k':
-                li.setProperty("mimetype", "audio/mpeg")
+                url = self._get_stream(key)
 
-            # Set player info
-            li.setInfo(type="Music", infoLabels={"Genre": "Drum & Bass",
-                                                 "Comment": "World Wide Drum & Bass",
-                                                 "Size": int(key[:-1]) * 1024})
-            li.setProperty("IsPlayable", "true")
-            xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=url, listitem=li, isFolder=False,
-                                        totalItems=total_items)
+                # Generate a list item for Kodi
+                li = xbmcgui.ListItem(label="Bassdrive @ %s" % key, thumbnailImage="%s" % os.path.join(self.bd_ppath,
+                                                                                                       'icon.png'))
+                # Set our stream quality, per Bassdrives website
+                li.setProperty("mimetype", "audio/aac")
+                if key == '128k':
+                    li.setProperty("mimetype", "audio/mpeg")
 
-        print total_items
+                # Set player info
+                li.setInfo(type="Music", infoLabels={"Genre": "Drum & Bass",
+                                                     "Comment": "World Wide Drum & Bass",
+                                                     "Size": int(key[:-1]) * 1024})
+                li.setProperty("IsPlayable", "true")
 
-        # tell XMBC there are no more items to list
-        xbmcplugin.endOfDirectory(self.bd_handle, succeeded=True)
+                isFolder=False
+
+                directory_items.append((url,li,isFolder))
+
+                xbmcplugin.addDirectoryItem(handle=self.bd_handle,url=url,listitem=li,isFolder=False)
+
+            archive_url = self._build_url({'mode': 'folder', 'foldername': 'Archives'})
+            test = xbmcgui.ListItem(label="Archives")
+            xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=archive_url,listitem=test,isFolder=True)
+            xbmcplugin.endOfDirectory(self.bd_handle, succeeded=True)
+
+        elif self.mode[0] == 'folder':
+
+            # the name of the directory from which this request came.
+            calling_foldername = self.args['foldername'][0]
+
+            # Display the lowest level of the archives datastructure
+            if calling_foldername == "Archives":
+                for archive_item in self.archive_data:
+
+                    item_name = archive_item['display_name']
+
+                    archive_url = self._build_url({'mode': 'folder', 'foldername': '{}/{}'.format(calling_foldername,item_name)})
+                    test = xbmcgui.ListItem(label=item_name)
+                    xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=archive_url,listitem=test,isFolder=True)
+            else:
+
+                # split out the calling foldername for use in searching the datastructure for the resquested directory
+                key_names = calling_foldername.split('/')
+
+                # collect data to display from the whole archive datastructure
+                data_to_display = self._fetch_nested_data(key_names=key_names,data_structure=self.archive_data)
+
+                for item in data_to_display:
+
+                    # if the item is a directory (stored as a dict) display accordingly, else, it's a file.
+                    if isinstance(item,dict):
+                        item_name = item['display_name']
+
+
+                        archive_url = self._build_url({'mode': 'folder', 'foldername': '{}/{}'.format(calling_foldername,item_name)})
+                        test = xbmcgui.ListItem(label=item_name)
+                        xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=archive_url,listitem=test,isFolder=True)
+
+                    else:
+                        #url = 'http://archives.bassdrivearchive.com/1%20-%20Monday/Fokuz%20Recordings%20Show/%5b2016.02.08%5d%20Fokuz%20Recordings%20Show%20-%20SATL.mp3'
+                        url = self._build_archives_url(item)
+
+                        # Generate a list item for Kodi
+                        li = xbmcgui.ListItem(label=item, thumbnailImage="%s" % os.path.join(self.bd_ppath,'icon.png'))
+                        # Set player info
+                        li.setInfo(type="Music", infoLabels={"Genre": "Drum & Bass",
+                                                             "Comment": "World Wide Drum & Bass" })
+
+                        li.setProperty("IsPlayable", "true")
+
+                        isFolder=False
+
+                        directory_items.append((url,li,isFolder))
+
+                        xbmcplugin.addDirectoryItem(handle=self.bd_handle,url=url,listitem=li,isFolder=False)
+
+            # when we're done adding items to the directory, finish drawing it.
+            xbmcplugin.endOfDirectory(self.bd_handle, succeeded=True)
 
         # Success
         return True
