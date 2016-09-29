@@ -32,7 +32,6 @@ def fetch_shit(url):
     
     urlpath = urllib2.urlopen(url)
 
-
     req_data = urlpath.read().decode('utf-8')
     anchors = anchor_re.findall(req_data)
 
@@ -57,8 +56,9 @@ def fetch_shit(url):
         else:
             if debug: print("[+] New dir " + item + ", recursing")
 
-            results.append( {'display_name': urllib.unquote(url_path).replace("/",""),
-                                'contents' : fetch_shit(url + url_path)})
+            sanitized_dir_name = urllib.unquote(url_path).replace("/","")
+
+            results.append( { sanitized_dir_name : fetch_shit(url + url_path)})
     
     #return req_data
     return results
