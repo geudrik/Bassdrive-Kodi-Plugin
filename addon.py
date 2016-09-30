@@ -159,20 +159,22 @@ class BassDrive:
 
         def recursive_fetch(url):
 
+            results = []
+
+            # We don't want to be going back upa level
             blacklisted_labels = [ 'Parent Directory' ]
 
+            # Regex that we're searching for in our html
             anchor_re = re.compile('<a href=\".*</a>')
             hrefs = re.compile('(?<=href=\"(?!http)(?!/\")).*(?=\">)')
             text = re.compile('(?<=\">).*(?=</a>)')
 
             pars = HTMLParser.HTMLParser()
             url = pars.unescape(url)
-
-            results = []
-            
             urlpath = urllib2.urlopen(url)
-
             req_data = urlpath.read().decode('utf-8')
+
+            # Get all of our named anchors
             anchors = anchor_re.findall(req_data)
 
             # Traverse our anchors / web structure
@@ -180,12 +182,14 @@ class BassDrive:
 
                 # separate href value from the label of the anchor and strip all leading/trailing whitespace
                 try:
-                    url_path = re.search(hrefs,item).group(0).strip()
-                    url_label = re.search(text,item).group(0).strip()
+                    url_path = re.search(hrefs, item).group(0).strip()
+                    url_label = re.search(text, item).group(0).strip()
 
+                # Handle edge cases, like when nothing matches
                 except:
                     continue
 
+                # Avoid infinite recursion
                 if url_label in blacklisted_labels:
                     continue
 
@@ -194,13 +198,23 @@ class BassDrive:
                     results.append(urllib.unquote(url_path))
 
                 else:
-                    sanitized_dir_name = urllib.unquote(url_path).replace("/","")
-                    results.append( { sanitized_dir_name : recursive_fetch(url + url_path)})
+
+                    # Make our directory name .. not url encoded
+                    dir_name = urllib.unquote(url_path).replace("/", "")
+
+                    # Get this folders contents, and add a new folder to results if there is content in it
+                    dir_contents = recursive_fetch(url + url_path)
+                    if len(dir_contents) > 0:
+                        results.append({ dir_name : dir_contents })
 
             return results
         
         results = recursive_fetch('http://archives.bassdrivearchive.com')
-        self.log(results)
+
+        # Look for keys that have empty lists as values
+        for root, key, value in results.walk():
+            if results[root]
+
         with open(self.arcache_streams_path, 'w+') as handle:
             json.dump(results, handle)
 
@@ -212,8 +226,16 @@ class BassDrive:
         Note that if the archives get huge, the memory footprint of this could get massive
         """
         self.log("Loading up our archive data from %s..." % self.arcache_streams_path)
-        with open(self.arcache_streams_path) as handle:
-            cache = json.load(handle)
+        try:
+            with open(self.arcache_streams_path) as handle:
+                cache = json.load(handle)
+            if cache is None:
+                raise Exception("Error reading the archive cache.. is it corrupt or malformed?")
+        except Exception as e:
+            self.log(e)
+            self.puke("There was an error reading the Archive Cache")
+
+
         return cache
 
     def _get_stream(self, quality):
