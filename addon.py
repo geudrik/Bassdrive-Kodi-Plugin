@@ -190,7 +190,7 @@ class BassDrive:
                     continue
 
                 # If the path doesn't end in a slash, it's a file
-                if re.search('/$',url_path) is None:
+                if re.search('/$', url_path) is None:
                     results.append(urllib.unquote(url_path))
 
                 else:
@@ -304,9 +304,9 @@ class BassDrive:
 
                 isFolder=False
 
-                directory_items.append((url,li,isFolder))
+                directory_items.append((url, li, isFolder))
 
-                xbmcplugin.addDirectoryItem(handle=self.bd_handle,url=url,listitem=li,isFolder=False)
+                xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=url, listitem=li, isFolder=False)
 
             # Add in our 'Archives' folder menu item
             archive_url = self._build_url({'mode': 'folder', 'foldername': 'Archives'})
@@ -317,10 +317,17 @@ class BassDrive:
         # Are we in Folder mode? eg: Have we selected 'Archives' from the main menu?
         elif self.mode[0] == 'folder':
 
+            # Check to see if our cache exists at all. If it doesn't, assume this
+            #   is a first run, and to force an update
+            if not os.path.exists(self.arcache_streams_path):
+                self.log("Archives cache not found. This must be a first run! Pulling archives...")
+                self.bd_addon.setSetting(id="archives_forceupdate", value="false")
+                self._update_archives()
+
             # Check to see if our cache has expired
             cachedays = int(self.bd_addon.getSetting("archives_cache_expiry_days"))
             if self._cache_file_has_expired(cachedays, self.arcache_streams_path):
-                self.log("Archive cache is expired. Requesting forced update...")
+                self.log("Archive cache is expired. Forcing an update...")
                 self.bd_addon.setSetting(id="archives_forceupdate", value="false")
                 self._update_archives()
                 
