@@ -306,8 +306,10 @@ class BassDrive(BDBase):
         Return:
             str                 URL encoded string we can stream from directly
         """
-        foldername.pop(0)
-        url = 'http://archives.bassdrivearchive.com/' + urllib.quote(foldername.join('/') + '/' + filename)
+        if foldername[0] == 'Archives':
+            del(foldername[0])
+
+        url = 'http://archives.bassdrivearchive.com/' + urllib.quote('/'.join(foldername) + '/' + filename)
         self.log('Built archive URL %s' % url)
         return url
 
@@ -411,7 +413,7 @@ class BassDrive(BDBase):
                 url = self.get_archive_url(foldername=self.foldername, filename=playable)
 
                 # Generate a list item for Kodi
-                li = xbmcgui.ListItem(label=item, thumbnailImage="%s" % os.path.join(self.bd_ppath,'icon.png'))
+                li = xbmcgui.ListItem(label=playable, thumbnailImage="%s" % os.path.join(self.bd_ppath,'icon.png'))
 
                 # Set player info
                 li.setInfo(type="Music", infoLabels={"Genre": "Drum & Bass",
