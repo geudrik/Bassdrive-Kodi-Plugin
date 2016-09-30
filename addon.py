@@ -271,8 +271,10 @@ class BassDrive:
             as well as the directory as found from self.args['foldername']
         """
         directory = self.args['foldername'][0].replace("Archives/","")
-
-        return 'http://archives.bassdrivearchive.com/%s/%s' % (directory,filename)
+        url = 'http://archives.bassdrivearchive.com/%s/%s' % (directory, filename)
+        url = urllib.quote(url)
+        self.log("Built stream URL: %s" % url)
+        return url
 
     # Lets play some Fishdrive!
     def run(self):
