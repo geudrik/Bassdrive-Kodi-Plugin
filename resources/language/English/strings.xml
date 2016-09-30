@@ -5,9 +5,14 @@
 	<!--GENERAL STRINGS -->
 
 	<!-- Category: General -->
-	<string id="30001">General</string>
+	<string id="30001">Stream Settings</string>
 	<string id="30011">Stream Cache Expiry (days)</string>
 	<string id="30012">Force all streams to be updated on reload of the plugin</string>
+
+	<!-- Category: General -->
+	<string id="30003">Archives Settings</string>
+	<string id="30013">Archives Cache Expiry (days)</string>
+	<string id="30014">Force the Archives to be refreshed at next run</string>
 
 	<!-- Category: About -->
 	<string id="30002">About</string>
