@@ -325,20 +325,23 @@ class BassDrive(BDBase):
         if self.cache_file_expired(filepath=self.cache_streams_path, days=cachedays) \
             or self.bd_addon.getSetting("forceupdate") == "true":
             self.bd_addon.setSetting(id="forceupdate", value="false")
+            self.log("Maintenance request to update stream cache")
             self.update_streams()
+            return
 
     def maintenance_archive_cache(self):
         """
         Convienience function we call from run() to keep run tidy
-        Checks if our stream cache exists, if it needs to be updated, etc
+        Checks if our archives cache exists, if it needs to be updated, etc
         """
 
         cachedays = int(self.bd_addon.getSetting("archives_cache_expiry_days"))
 
         # Ensure file exists / not expired. This returns as expired if the file doesn't exist!
         if self.cache_file_expired(filepath=self.arcache_streams_path, days=cachedays) \
-            or self.bd_addon.getSetting("forceupdate") == "true":
+            or self.bd_addon.getSetting("archives_forceupdate") == "true":
             self.bd_addon.setSetting(id="archives_forceupdate", value="false")
+            self.log("Maintenance request to update archive cache")
             self.update_archives()
 
     def run(self):
