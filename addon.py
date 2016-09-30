@@ -407,7 +407,7 @@ class BassDrive(BDBase):
             display_data = self.get_archives_display_page(self.foldername)
 
             # Display files/streams to play
-            for playable in display_data[0]:
+            for playable in sorted(display_data[0]):
 
                 # Build our URL and add the item!
                 url = self.get_archive_url(foldername=self.foldername, filename=playable)
@@ -425,7 +425,7 @@ class BassDrive(BDBase):
 
 
             # Display folders
-            for folder in display_data[1]:
+            for folder in sorted(display_data[1]):
 
                 # Build the relative URL for this item (this is XBMC URL lingo)
                 archive_url = self.build_xbmc_url({'mode': 'folder', 'foldername': '%s/%s' % (calling_folder, folder) })
