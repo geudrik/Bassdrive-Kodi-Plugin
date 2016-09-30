@@ -11,7 +11,6 @@ from datetime import datetime
 from urllib2 import urlopen
 
 import HTMLParser
-import test_data
 import urlparse
 import urllib2
 import urllib
@@ -197,6 +196,8 @@ class BassDrive:
                 else:
                     sanitized_dir_name = urllib.unquote(url_path).replace("/","")
                     results.append( { sanitized_dir_name : recursive_fetch(url + url_path)})
+
+            return results
         
         results = recursive_fetch('http://archives.bassdrivearchive.com')
         self.log(results)
@@ -253,7 +254,7 @@ class BassDrive:
         """
         directory = self.args['foldername'][0].replace("Archives/","")
 
-        return 'http://archives.bassdrivearchive.com/{}/{}'.format(directory,filename)
+        return 'http://archives.bassdrivearchive.com/%s/%s' % (directory,filename)
 
     # Lets play some Fishdrive!
     def run(self):
@@ -267,13 +268,14 @@ class BassDrive:
         # Check to see if our cache has expired
         cachedays = int(self.bd_addon.getSetting("stream_cache_expiry_days"))
         if self._cache_file_has_expired(cachedays, self.cache_streams_path):
-            self.log("Stream cache is expired. Requesting forced update")
-            self._update_streams()
+            self.log("Stream cache is expired. Requesting forced update...")
             self.bd_addon.setSetting(id="forceupdate", value="false")
+            self._update_streams()
 
         # Check to see if we're focing an update
         if self.bd_addon.getSetting("forceupdate") == "true":
             self.log("A force update been requested. Updating cache...")
+            self.bd_addon.setSetting(id="forceupdate", value="false")
             self._update_streams()
 
         directory_items = []
@@ -318,32 +320,33 @@ class BassDrive:
             # Check to see if our cache has expired
             cachedays = int(self.bd_addon.getSetting("archives_cache_expiry_days"))
             if self._cache_file_has_expired(cachedays, self.arcache_streams_path):
-                self.log("Archive cache is expired. Requesting update")
-                self._update_archives()
+                self.log("Archive cache is expired. Requesting forced update...")
                 self.bd_addon.setSetting(id="archives_forceupdate", value="false")
-
+                self._update_archives()
+                
             # Check to see if we're focing an update
             if self.bd_addon.getSetting("archives_forceupdate") == "true":
                 self.log("A force update been requested. Updating cache...")
+                self.bd_addon.setSetting(id="archives_forceupdate", value="false")
                 self._update_archives()
 
             # The name of the directory that called for this folder (eg: ../)
             calling_foldername = self.args['foldername'][0]
 
+            # Load our cache file
+            try:
+                archive_data = self._load_archive_data()
+            except:
+                self.puke("No Archives cache file found. Open the settings, set cache to force-update, and restart the addon")
+                return
+
             # If our calling folder is 'Archives', we want to display the top-level archives info (eg: Monday...)
             if calling_foldername == "Archives":
-
-                try:
-                    archive_data = self._load_archive_data()
-                except:
-                    self.puke("No Archives cache file found. Open the settings, set cache to force-update, and restart the addon")
-                    return
-
                 for archive_item in archive_data:
-
                     item_name = archive_item.keys()[-1]
+                    self.log("Calling foldername: %s item_name %s" % (calling_foldername, item_name))
 
-                    archive_url = self._build_url({'mode': 'folder', 'foldername': '{}/{}'.format(calling_foldername,item_name)})
+                    archive_url = self._build_url({'mode': 'folder', 'foldername': '%s/%s' % (calling_foldername, item_name) })
                     test = xbmcgui.ListItem(label=item_name)
                     xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=archive_url,listitem=test,isFolder=True)
             else:
@@ -352,7 +355,7 @@ class BassDrive:
                 key_names = calling_foldername.split('/')
 
                 # collect data to display from the whole archive datastructure
-                data_to_display = self._fetch_nested_data(key_names=key_names,data_structure=self.archive_data)
+                data_to_display = self._fetch_nested_data(key_names=key_names, data_structure=archive_data)
 
                 # Begin to display menu items for this subfolder
                 for item in data_to_display:
@@ -362,9 +365,9 @@ class BassDrive:
                         item_name = item.keys()[-1]
 
 
-                        archive_url = self._build_url({'mode': 'folder', 'foldername': '{}/{}'.format(calling_foldername,item_name)})
+                        archive_url = self._build_url({'mode': 'folder', 'foldername': '%s/%s' % (calling_foldername, item_name)})
                         test = xbmcgui.ListItem(label=item_name)
-                        xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=archive_url,listitem=test,isFolder=True)
+                        xbmcplugin.addDirectoryItem(handle=self.bd_handle, url=archive_url, listitem=test, isFolder=True)
 
                     # Item is a file, so make it playable
                     else:
