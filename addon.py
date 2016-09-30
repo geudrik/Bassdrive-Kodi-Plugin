@@ -211,10 +211,6 @@ class BassDrive:
         
         results = recursive_fetch('http://archives.bassdrivearchive.com')
 
-        # Look for keys that have empty lists as values
-        for root, key, value in results.walk():
-            if results[root]
-
         with open(self.arcache_streams_path, 'w+') as handle:
             json.dump(results, handle)
 
