@@ -6,6 +6,11 @@
         <setting id="forceupdate" type="bool" label="30012" default="false" />
 	</category>
 
+	<category label="30003">
+		<setting id="archives_cache_expiry_days" type="slider" label="30013" default="1" range="0,1,28" option="int" />
+        <setting id="archives_forceupdate" type="bool" label="30014" default="false" />
+	</category>
+
 	<category label="30002">
 		<setting type="lsep" label="30025" />
 		<setting type="lsep" label="30026" />
